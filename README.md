@@ -36,7 +36,7 @@ make install
 
 
 ```bash
-streamlit run app.py
+streamlit run src/app.py
 ```
 or if you have `make` insatlled
 ```bash
@@ -51,15 +51,16 @@ This will open the app in your web browser.
 
 ```
 taylor-swift-search-engine/
-├── app.py          # Streamlit app
-├── main.py         # Search engine logic (SwiftEngine class)
-├── utils.py        # Utility functions (data preprocessing, chunking, clean_df)
-├── data/           # Data files
-│   ├── songs.csv      # Original songs data (input)
+├── src/                  # Source Code files
+│   ├── app.py            # Streamlit app
+│   ├── main.py           # Search engine logic (SwiftEngine class)
+│   └── utils.py          # Utility functions (data preprocessing, chunking, clean_df)
+├── data/                 # Data files
+│   ├── songs.csv         # Original songs data (input)
 │   └── songs_chunked.csv # Processed data (used by the search engine)
-├── requirements.txt # Project dependencies
-├── README.md       # This file
-└── Makefile        # Makefile for easy commands
+├── requirements.txt      # Project dependencies
+├── README.md             # This file
+└── Makefile              # Makefile for easy commands
 ```
 
 ## Makefile
