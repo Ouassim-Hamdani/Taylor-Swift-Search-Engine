@@ -4,6 +4,7 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 import string
+from spellchecker import SpellChecker
 
 def clean_lyrics(lyrics):
     cleaned_lyrics = re.sub(r"\[.*?\]", "", lyrics)
@@ -65,3 +66,22 @@ def create_pd_chunked(filename='data/songs.csv',output="data/songs_chunked.csv")
 def create_df():
     clean_df()
     create_pd_chunked()
+    
+    
+def correct_spelling_tokens(tokens): 
+    corrected_tokens = []
+    spell = SpellChecker()
+    for token in tokens:
+        if token in spell:
+            corrected_tokens.append(token)
+        else:
+            suggestion = spell.correction(token)
+            if suggestion:
+                corrected_tokens.append(suggestion)
+            else:
+                corrected_tokens.append(token)
+    return corrected_tokens
+
+ALBUM_EMOJI = {"The Tortured Poets Department":"🪶","1989 (Taylor's Version)":"🌊","Taylor Swift":"📗","Fearless (Taylor's Version)":"💛","Speak Now (Taylor's Version)":"📔","Red (Taylor's Version)":"🧣","reputation":"🐍","Lover":"💕","folklore":"🪩","evermore":"🍂","Midnights":'🌌','The Taylor Swift Holiday Collection':'🎎','The Hunger Games':'🏹',"How Long Do You Think It's Gonna Last":'🪕',
+               "Cats":"🐈","Where The Crawdads Sing":"⛵","Christmas Tree Farm":"🎄","Fifty Shades Darker":"🖤","Miss Americana":"👑","Love Drunk":"💌","Women in Music Part III":"👩","Two Lanes of Freedom":"🛣️","Bad Blood (Remix) (Taylor's Version)":"🩸","The Hannah Montana Movie":"🎸"
+               ,"Beautiful Eyes":"👀"}
