@@ -1,7 +1,7 @@
 # Taylor Swift Lyrics Search Engine  (𝑻𝒂𝒚𝒍𝒐𝒓’𝒔 𝑽𝒆𝒓𝒔𝒊𝒐𝒏)  🧣🍂
 
 This project implements a simple search engine for Taylor Swift lyrics using inverse index technique. It allows users to search for lyrics and view the matching songs, albums, and lyrics snippets, academic project.
-
+Accessible at https://taylor-swift.streamlit.app/
 ## Features
 
 * **Lyrics Search:** Swift up the lyrics using keywords.
