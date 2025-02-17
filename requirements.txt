@@ -1,5 +1,5 @@
 lyricsgenius
 pandas
-ntlk
+nltk
 streamlit
 pyspellchecker
