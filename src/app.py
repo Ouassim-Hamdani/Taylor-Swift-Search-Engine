@@ -1,20 +1,14 @@
 import streamlit as st
-from main import SwiftEngine
+from main import SwiftEngineSemantic
 from utils import preprocess_text,ALBUM_EMOJI
 import re
 st.set_page_config(page_title="Taylor Swift Lyrics Search", page_icon="🧣", layout="wide") 
-def highlight_query_in_lyrics(lyrics, query):
-    """Highlights the query terms in the lyrics snippet."""
-    query_tokens = preprocess_text(query)  
-    snippet = ""
-    for token in query_tokens:
-        lyrics = re.sub(r"\b" + re.escape(token) + r"\b", r"**\g**", lyrics, flags=re.IGNORECASE)
-    return lyrics
+
 
 @st.cache_resource
 def load_engine():
     """Cached function to load engine search ONCE at startup"""
-    engine = SwiftEngine()
+    engine = SwiftEngineSemantic(".env")
     return engine
 
 engine = load_engine()
@@ -31,28 +25,29 @@ with col2:
         with col_input2:
             st.container(height=12,border=0)
             search_button = st.button("🔎")
-    search_type = st.radio("Search Type:", ("Normal", "Phrase"), horizontal=True) 
-    correct_spelling = st.checkbox("Correct Spelling")
+    search_type = st.radio("Search Type:", ("Ontology", "Ontology LLM","Semantic"), horizontal=True) 
     
 
 if query or search_button :
     with st.spinner("Searching..."):
-        results, query_tokens = engine.search_full(query, search_type == "Phrase", correct_spelling)
+        if search_type!="Semantic":
+            results, query_tokens = engine.search(query,use_llm= search_type=="Ontology LLM")
+        else:
+            results = engine.semanticSearch(query)
+            query_tokens = None
         with col2:
-            st.write(f"Searching for: {', '.join(query_tokens)}")
+            if query_tokens:
+                st.write(f"Searching for: {', '.join(query_tokens)}")
             if results:
                 st.write(f"Found {len(results)} results:")
                 for idx,result in enumerate(results):
                     st.markdown(f"### {result['song']} - {result['album']} {ALBUM_EMOJI[result["album"]]}")
                     st.markdown(result["lyrics"].replace("\n", "\n\n"))
-                    st.write(f"Relevance: {result['occ']}")
+                    #st.write(f"Relevance: {result['occ']}")
                     if idx!=len(results)-1:
                         st.write("---")
             else:
-                if results is None:
-                    st.warning("Switch to Normal Search. Your phrase is too short.")
-                else:
-                    st.info("No results found. Try a different search.")
+                    st.info("No results found. Try a different search., if you're using LLM it can be taht model couldn't capture keywords try again")
 
 
 else:

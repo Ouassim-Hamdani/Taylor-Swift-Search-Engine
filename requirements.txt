@@ -1,5 +1,7 @@
-lyricsgenius
+ollama
+owlready2
 pandas
-nltk
-streamlit
-pyspellchecker
+neo4j
+sentence-transformers
+tensorflow-intel
+tf-keras

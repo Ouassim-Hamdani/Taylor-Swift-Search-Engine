@@ -1,109 +1,139 @@
 import pandas as pd
 import nltk
-nltk.download('punkt_tab')
+import re
+from nltk.corpus import stopwords
+from neo4j import GraphDatabase
+from dotenv import load_dotenv
+import ollama,json,os
+from utils import get_sentence_embeddings,calculate_similarity,rank_segments
 nltk.download('stopwords')
-from utils import preprocess_text,correct_spelling_tokens
 
 
 
             
-class SwiftEngine:
-    def __init__(self,data_file="data/songs_chunked.csv"):
-        self.df = pd.read_csv(data_file)
-        self.inverse_index = {}
-        self.create_index()
-    def create_index(self):
-        for idx,row in self.df.iterrows():
-            lyrics = row["CHUNK"]
-            id = str(row["ID"])
-            tokens = preprocess_text(lyrics)
-            for pos,token in enumerate(tokens):
-                if token not in self.inverse_index:
-                    self.inverse_index[token] = {}
-                if id not in self.inverse_index[token]:
-                    self.inverse_index[token][id] = []
-                self.inverse_index[token][id].append(pos)
-    def search(self,query,correcter=True):
-        query_tokens = preprocess_text(query)
-        if correcter:
-            query_tokens = correct_spelling_tokens(query_tokens)
-        results = {}
-        for token in query_tokens:
-            if token in self.inverse_index:
-                for id, positions in self.inverse_index[token].items():
-                    if id not in results:
-                        results[id] = 0  
-                    results[id] += len(positions) 
-
-        print(results)
-        ranked_results = sorted(results.items(), key=lambda item: item[1], reverse=True)
-        print(ranked_results)
-        return ranked_results,query_tokens
-    
-    def retrieve_lyrics(self,id):
-        id = int(id)
-        row = self.df.iloc[id]
-        
-        return row["CHUNK"],row['SONG'],row['ALBUM']
-
-    
-    def search_show(self,query):
-        results = self.search(query)
-        print(f"\n\n\n\nShowcasing results for '{query}'\nFound {len(results)} results.\n")
-        for id,occ in results:
-            lyrics,title,album = self.retrieve_lyrics(id)
-            print(f"{title} - {album}\n---------------------\n{lyrics}\n\n\n")
-            
-    def search_full(self,query,phrase=False,correcter=False):
-        if phrase:
-            results,query_tokens = self.search_phrase(query,correcter)
-            if results is None: # cauuse nto possible, phrase too short
-                return None,query_tokens
+class SwiftEngineSemantic:
+    def __init__(self,env_file="../.env"):
+        load_dotenv(env_file)
+        self.driver = GraphDatabase.driver(
+            os.environ["NEO4J_URI"],
+            auth=(os.environ["NEO4J_USERNAME"], os.environ["NEO4J_PASSWORD"])
+        )
+    def search(self,query,use_llm=True):
+        if not use_llm:
+            keywords = self.simpleTokenizer(query)
         else:
-            results,query_tokens = self.search(query,correcter)
-        results_full = []
-        for id,occ in results:
-            lyrics,title,album = self.retrieve_lyrics(id)
-            results_full.append({"lyrics":lyrics,"song":title,"album":album,"occ":occ})
-        return results_full,query_tokens
+            keywords = self.llmKeywordExtractor(query)
+        if keywords:
+            return self.graphKeywordSearch(keywords),keywords
+        return [],[]
     
-    def search_phrase(self,query,correcter=True):
-        query_tokens = preprocess_text(query)
-        if correcter:
-            query_tokens = correct_spelling_tokens(query_tokens)
-        results = {}
-        if len(query_tokens) <2:
-            return None,query_tokens
+    def semanticSearch(self,query,top=10):
+        query_embedding = get_sentence_embeddings([query])[0]
+        segments = self.getAllSegments()
+        similarity_scores = calculate_similarity(query_embedding, [seg["embedding"] for seg in segments])
+        return rank_segments(segments, similarity_scores,top_n=top)
         
-        if query_tokens[0] not in self.inverse_index:
-            return [],query_tokens #if start of phrase ulac, then empty
+    def simpleTokenizer(self,query):
+        words = query.lower().split()
+        stop_words = set(stopwords.words('english'))
+        return [word for word in words if word not in stop_words]
         
-        for idx_1,pos1 in self.inverse_index[query_tokens[0]].items(): #exploring documents of first word dictionary
-            if idx_1 not in results:
-              results[idx_1] = 0
-            for pos1_i in pos1:
-                valid_phrase = True
-                for i in range(1, len(query_tokens)):
-                    next_token = query_tokens[i]
-                    if next_token not in self.inverse_index: #next word not present at all.
-                        valid_phrase = False
-                        break
+    def llmKeywordExtractor(self,query,model_name="deepseek-r1:1.5b"):
+        prompt = f"""
+            You are an expert keyword extractor. Your task is to analyze the user's query and extract the most relevant keywords.
 
-                    found_next = False # now we know its present, but is it right after first word in doc of idx1, we compare their positions
-                    if idx_1 in self.inverse_index[next_token]: #if doc of first word present here too
-                        for pos2 in self.inverse_index[next_token][idx_1]: # its opresent we compare positions
-                            if pos2 == pos1_i + i:  # Check for consecutive positions
-                                found_next = True
-                                break
-                    if not found_next:
-                        valid_phrase = False
-                        break
+            User Query: "{query}"
 
-                if valid_phrase:
-                    results[idx_1] += 1  
-            if results[idx_1]==0: #side bug forget to remove documents that have 0 occ
-                del results[idx_1]
-        ranked_results = sorted(results.items(), key=lambda item: item[1], reverse=True)
-        return ranked_results,query_tokens
+            Instructions:
+            1.  Identify the core concepts and entities mentioned in the query.
+            2.  Extract the most significant words or phrases that represent these concepts.
+            3.  Exclude common words or stop words that do not contribute to the meaning.
+            4.  Return the extracted keywords in a JSON format with the key "keywords" and the value as a list of strings.
+            5. Don't add nothing more from query, avoid hallucinations
+            Example input :
+            "Songs that talke about happy memories of someone gone, and love shared."
+            Example Output:
+            ```json
+            {{"keywords":["love", "sadness", "memories","bereft"]}}
+            ```
+            """
+
+        try:
+            json_prompt = f"{prompt}\n\nRespond with JSON format."
+            response = ollama.chat(model=model_name, messages=[
+                {
+                    'role': 'user',
+                    'content': json_prompt,
+                    
+                },
+            ],options={"temperature": 0})
+            json_match = re.search(r'```json\s*(.*?})\s*```', response['message']['content'], re.DOTALL)
+            if json_match:
+                try:
+                    return json.loads(json_match.group(1))["keywords"]
+                except json.JSONDecodeError:
+                    return None
+            else:
+                return None
+        except Exception as e:
+            return json.dumps({"error": f"An error occurred: {e}"})
+        
     
+    
+    def graphKeywordSearch(self,keywords,limit=30):
+        with self.driver.session() as session:
+            results = []
+            for word in keywords:
+                # Search in Segment text
+                segment_results = session.run("""
+                     MATCH (seg:Segment)<-[:CONTAINS]-(song:Song)-[:BELONGS_TO]->(album:Album)
+                    WHERE seg.text CONTAINS $word
+                    RETURN seg.text, song.title, album.name
+                    LIMIT 5
+                """, word=word)
+                for record in segment_results:
+                    results.append({"lyrics":record['seg.text'],"source":"direct","song":record["song.title"],"album":record["album.name"]})
 
+                # Search in Emotion names
+                emotion_results = session.run("""
+                    MATCH (e:Emotion)-[:EXPRESSES]-(seg:Segment)<-[:CONTAINS]-(song:Song)-[:BELONGS_TO]->(album:Album)
+                    WHERE e.name = $word
+                    RETURN seg.text, song.title, album.name
+                    LIMIT 5
+                """, word=word)
+                for record in emotion_results:
+                    results.append({"lyrics":record['seg.text'],"source":"emotion","song":record["song.title"],"album":record["album.name"]})
+
+                # Search in Theme names
+                theme_results = session.run("""
+                    MATCH (t:Theme)-[:DEALS_WITH]-(seg:Segment)<-[:CONTAINS]-(song:Song)-[:BELONGS_TO]->(album:Album)
+                    WHERE t.name = $word
+                    RETURN seg.text, song.title, album.name
+                    LIMIT 5
+                """, word=word)
+                for record in theme_results:
+                    results.append({"lyrics":record['seg.text'],"source":"theme","song":record["song.title"],"album":record["album.name"]})
+        return results[:min(len(results),limit)]
+    
+    def getAllSegments(self):
+        """Retrieves all lyric segments from Neo4j."""
+        with self.driver.session() as session:
+            results = session.run(""" MATCH (seg:Segment)<-[:CONTAINS]-(song:Song)-[:BELONGS_TO]->(album:Album)
+                    RETURN seg.text,seg.embedding,song.title, album.name""")
+            segments = [{"lyrics":record['seg.text'],"source":"semantic","song":record["song.title"],"album":record["album.name"],"embedding":record["seg.embedding"]} for record in results]
+            return segments
+    
+    def display(self,results):
+        for res in results:
+            print(res)
+            print(f"{res["song"]} - {res["album"]}")
+            print(f"\n{res["lyrics"]}")
+            print(f"\n Source : {res["source"]}")
+            print("----------------------------------")
+        print(f"Showing {len(results)} result.")
+
+
+if __name__=="__main__":
+    eng = SwiftEngineSemantic()
+    res,keywords = eng.search("My lover left me",use_llm=True)
+    eng.display(res)

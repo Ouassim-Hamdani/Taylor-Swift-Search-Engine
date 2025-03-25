@@ -85,3 +85,24 @@ def correct_spelling_tokens(tokens):
 ALBUM_EMOJI = {"The Tortured Poets Department":"🪶","1989 (Taylor's Version)":"🌊","Taylor Swift":"📗","Fearless (Taylor's Version)":"💛","Speak Now (Taylor's Version)":"📔","Red (Taylor's Version)":"🧣","reputation":"🐍","Lover":"💕","folklore":"🪩","evermore":"🍂","Midnights":'🌌','The Taylor Swift Holiday Collection':'🎎','The Hunger Games':'🏹',"How Long Do You Think It's Gonna Last":'🪕',
                "Cats":"🐈","Where The Crawdads Sing":"⛵","Christmas Tree Farm":"🎄","Fifty Shades Darker":"🖤","Miss Americana":"👑","Love Drunk":"💌","Women in Music Part III":"👩","Two Lanes of Freedom":"🛣️","Bad Blood (Remix) (Taylor's Version)":"🩸","The Hannah Montana Movie":"🎸"
                ,"Beautiful Eyes":"👀"}
+
+#SEMANTIC
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+def get_sentence_embeddings(sentences, model_name='all-mpnet-base-v2'):
+    """Generates sentence embeddings using sentence transformers."""
+    model = SentenceTransformer(model_name)
+    embeddings = model.encode(sentences)
+    return embeddings
+
+def calculate_similarity(query_embedding, segment_embeddings):
+    """Calculates cosine similarity between the query and segment embeddings."""
+    similarity_scores = cosine_similarity([query_embedding], segment_embeddings)[0]
+    return similarity_scores
+
+def rank_segments(segments, similarity_scores, top_n=10):
+    """Ranks segments based on similarity scores and returns the top results."""
+    ranked_segments = list(zip(segments, similarity_scores))
+    ranked_segments.sort(key=lambda item: item[1], reverse=True)
+    return [x[0] for x in ranked_segments[:top_n]]

@@ -1,6 +1,6 @@
 # Taylor Swift Lyrics Search Engine  (𝑻𝒂𝒚𝒍𝒐𝒓’𝒔 𝑽𝒆𝒓𝒔𝒊𝒐𝒏)  🧣🍂
 
-This project implements a simple search engine for Taylor Swift lyrics using inverse index technique. It allows users to search for lyrics and view the matching songs, albums, and lyrics snippets, academic project.
+This project implements a semantic search engine based on ontologies, and using an LLM, for Taylor Swift lyrics. It allows users to search for lyrics and view the matching songs, albums, and lyrics snippets, academic project.
 Accessible at https://taylor-swift.streamlit.app/
 ## Features
 
@@ -45,6 +45,8 @@ make run
 
 This will open the app in your web browser.
 
+## STEPS 
+- Using Deepseek r1 ollama, we run for 3 hours a process that extract emotions, themes from a chunk of lyrics, to add that to our database
 
 
 ## File Structure
@@ -93,3 +95,6 @@ Title,Album,Lyrics
 
 Enjoy searching through Taylor Swift's lyrics effortlessly like an Anti-Hero from a fellow Swifite! 🎵✨
 
+
+
+15k relations,6k nodes
