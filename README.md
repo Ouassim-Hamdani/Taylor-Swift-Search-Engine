@@ -39,7 +39,9 @@ A semantic and ontology-based search engine for Taylor Swift lyrics with three d
    - `scripts/add_embeddings.py`:
      - Adds `all-mpnet-base-v2` embeddings to all lyric segments
 
+
 **Database Visualization** :
+
 ![alt text](figs/db.png)
 
 
