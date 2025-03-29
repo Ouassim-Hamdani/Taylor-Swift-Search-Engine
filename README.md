@@ -1,100 +1,91 @@
 # Taylor Swift Lyrics Search Engine  (𝑻𝒂𝒚𝒍𝒐𝒓’𝒔 𝑽𝒆𝒓𝒔𝒊𝒐𝒏)  🧣🍂
 
-This project implements a semantic search engine based on ontologies, and using an LLM, for Taylor Swift lyrics. It allows users to search for lyrics and view the matching songs, albums, and lyrics snippets, academic project.
-Accessible at https://taylor-swift.streamlit.app/
+*"I can still make the whole place shimmer"*. This search engine helps you find exactly which shimmering lyrics you're looking for!
+A semantic and ontology-based search engine for Taylor Swift lyrics with three distinct search approaches.
+
 ## Features
 
-* **Lyrics Search:** Swift up the lyrics using keywords.
-* **Results Display:** Displays matching songs, albums, and relevant lyrics snippets.
-* **Streamlit UI:** Easy-to-use web interface built with Streamlit.
-* **Efficient Indexing:** Uses an inverted index for fast search lookups.
-* **Data Preprocessing:** Includes data cleaning and preprocessing steps.
+- **Three Search Modes**:
+  - **Ontology (Keyword Search)**: Direct keyword matching in the knowledge graph
+  - **Ontology LLM**: LLM-extracted keywords for graph search
+  - **Semantic**: Vector similarity search using embeddings
 
-## Installation
+- **Knowledge Graph** with 5 entity types:
+  - Songs
+  - Albums
+  - Lyrics Segments (4-line chunks)
+  - Themes
+  - Emotions
 
-### 1. Clone the repository:
+## Ontology' Architecture
 
-```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/taylor-swift-lyrics-search.git  # Replace with your repo URL
-cd taylor-swift-lyrics-search
-```
+![Ontology Diagram](figs/ontology.png) 
 
+## Data Pipeline
+![](figs/dataprep.png)
+1. **Data Preparation**:
+   - `scripts/extract_emotions_data.py`: 
+     - Chunks lyrics into 4-line segments
+     - Uses LLM (Deepseek r1 1.5b) to extract emotions/themes for each segment
+     - Outputs enriched CSV with emotions/themes
 
-### 2. Install dependencies:
+2. **Graph Construction**:
+   - `scripts/fill_ontology.py`:
+     - Creates Neo4j graph with Song/Album/Segment/Theme/Emotion nodes
+     - Establishes relationships between entities
+     - A total of `6k nodes` were generated, connected with `15k relations`.
 
-```bash
-pip install -r requirements.txt
-```
-or if you have `make` installed
-```bash
-make install
-```
+3. **Embedding Generation**:
+   - `scripts/add_embeddings.py`:
+     - Adds `all-mpnet-base-v2` embeddings to all lyric segments
 
-
-## How to run:
-
-
-
-```bash
-streamlit run src/app.py
-```
-or if you have `make` insatlled
-```bash
-make run
-```
-
-This will open the app in your web browser.
-
-## STEPS 
-- Using Deepseek r1 ollama, we run for 3 hours a process that extract emotions, themes from a chunk of lyrics, to add that to our database
+**Database Visualization** :
+![alt text](figs/db.png)
 
 
-## File Structure
+## Search Implementation
 
-```
-taylor-swift-search-engine/
-├── src/                  # Source Code files
-│   ├── app.py            # Streamlit app
-│   ├── main.py           # Search engine logic (SwiftEngine class)
-│   └── utils.py          # Utility functions (data preprocessing, chunking, clean_df)
-├── data/                 # Data files
-│   ├── songs.csv         # Original songs data (input)
-│   └── songs_chunked.csv # Processed data (used by the search engine)
-├── requirements.txt      # Project dependencies
-├── README.md             # This file
-└── Makefile              # Makefile for easy commands
-```
+- **Main Components** (`main.py`):
+  - `SwiftEngineSemantic` class handles all search logic
+  - 4 main methods:
+    1. `simpleTokenizer()`: Basic keyword extraction
+    2. `llmKeywordExtractor()`: LLM-enhanced keyword extraction
+    3. `semanticSearch()`: Full vector similarity search
+    4. `search()`: Groups `simpleTokenizer/llmKeywordExtractor` with graph searcher to create full pipeline.
 
-## Makefile
+- **Web Interface** (`app.py`):
+  - Streamlit-based UI with three search options
+  - Displays results with song/album context
 
-The included `Makefile` provides convenient commands:
+## How to Use
 
-- `make run`: Runs the Streamlit app.
-- `make install`: Installs the required Python packages.
+1. **Setup**:
+   ```bash
+   pip install -r requirements.txt
+   ollama pull deepseek-r1:1.5b
+   ```
+    *Note : Make sure Ollama is installed*
 
-## Dependencies
+2. **Run**:
+   ```bash
+   make run
+   ```
 
-Ensure you have the following Python libraries installed:
+### Search Options:
+In total, we have 3 modes
 
-- **Streamlit**
-- **Pandas**
-- **NLTK** (including `punkt` and `stopwords` data)
-- **Pydantic**
-- **Regular Expression library (re)**
+**Ontology**: Fast keyword search in graph, using simple tokenization
 
-## Example `songs.csv` format:
+**Ontology LLM**: Smarter keyword extraction via LLM, followed by a graph search.
 
-```csv
-Title,Album,Lyrics
-"Shake It Off","1989","This sick beat..."
-"Blank Space","1989","Darling, I'm a nightmare dressed as a daydream..."
-# ... more songs
-```
+**Semantic**: Most sophisticated semantic search, using embeddings and cosine similiarity.
 
----
+![](figs/query.png)
+### Performance Notes
+- LLM emotion/theme extraction took `~3 hours` for full dataset
 
-Enjoy searching through Taylor Swift's lyrics effortlessly like an Anti-Hero from a fellow Swifite! 🎵✨
+- All embeddings generated with `all-mpnet-base-v2`
 
+- Neo4j optimized for complex graph queries
 
-
-15k relations,6k nodes
+*🔮 This is our place, we make the rules.*
